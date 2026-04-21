@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Activity, Segment, SegmentEffort
+from app.models import Activity, Lap, Segment, SegmentEffort
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -26,6 +26,64 @@ def list_activities(
         "total": total,
         "items": [_activity_dict(a) for a in items],
     }
+
+
+@router.get("/{athlete_id}/{activity_id}")
+def get_activity(athlete_id: int, activity_id: int, db: Session = Depends(get_db)):
+    activity = (
+        db.query(Activity)
+        .options(
+            joinedload(Activity.laps),
+            joinedload(Activity.segment_efforts).joinedload(SegmentEffort.segment),
+        )
+        .filter(Activity.id == activity_id, Activity.athlete_id == athlete_id)
+        .first()
+    )
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    base = _activity_dict(activity)
+    base["map_polyline"] = activity.map_polyline
+    base["map_summary_polyline"] = activity.map_summary_polyline
+    base["start_latlng"] = (
+        [activity.start_latlng_lat, activity.start_latlng_lng]
+        if activity.start_latlng_lat is not None else None
+    )
+    base["description"] = activity.description
+    base["laps"] = [
+        {
+            "lap_index": lap.lap_index,
+            "name": lap.name,
+            "distance_km": round(lap.distance / 1000, 2) if lap.distance else None,
+            "moving_time": lap.moving_time,
+            "average_speed": lap.average_speed,
+            "pace_min_per_km": round((1000 / lap.average_speed) / 60, 2) if lap.average_speed else None,
+            "average_heartrate": lap.average_heartrate,
+            "total_elevation_gain": lap.total_elevation_gain,
+        }
+        for lap in sorted(activity.laps, key=lambda l: l.lap_index or 0)
+    ]
+    base["segment_efforts"] = [
+        {
+            "segment_id": e.segment_id,
+            "name": e.name,
+            "elapsed_time": e.elapsed_time,
+            "distance_m": e.distance,
+            "average_heartrate": e.average_heartrate,
+            "pr_rank": e.pr_rank,
+            "kom_rank": e.kom_rank,
+            "segment_start_latlng": (
+                [e.segment.start_latlng_lat, e.segment.start_latlng_lng]
+                if e.segment and e.segment.start_latlng_lat is not None else None
+            ),
+            "segment_end_latlng": (
+                [e.segment.end_latlng_lat, e.segment.end_latlng_lng]
+                if e.segment and e.segment.end_latlng_lat is not None else None
+            ),
+        }
+        for e in sorted(activity.segment_efforts, key=lambda e: e.start_date or activity.start_date)
+    ]
+    return base
 
 
 @router.get("/{athlete_id}/pace-over-time")
@@ -158,7 +216,12 @@ def _activity_dict(a: Activity) -> dict:
         "average_speed": a.average_speed,
         "pace_min_per_km": round((1000 / a.average_speed) / 60, 2) if a.average_speed else None,
         "average_heartrate": a.average_heartrate,
+        "max_heartrate": a.max_heartrate,
         "total_elevation_gain": a.total_elevation_gain,
         "average_watts": a.average_watts,
+        "average_cadence": a.average_cadence,
         "suffer_score": a.suffer_score,
+        "kudos_count": a.kudos_count,
+        "trainer": a.trainer,
+        "map_summary_polyline": a.map_summary_polyline,
     }

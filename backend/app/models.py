@@ -45,6 +45,9 @@ class Activity(Base):
     kudos_count: Mapped[int | None] = mapped_column(Integer)
     achievement_count: Mapped[int | None] = mapped_column(Integer)
     map_summary_polyline: Mapped[str | None] = mapped_column(Text)
+    map_polyline: Mapped[str | None] = mapped_column(Text)  # full-resolution
+    start_latlng_lat: Mapped[float | None] = mapped_column(Float)
+    start_latlng_lng: Mapped[float | None] = mapped_column(Float)
     trainer: Mapped[bool] = mapped_column(Boolean, default=False)
     commute: Mapped[bool] = mapped_column(Boolean, default=False)
     gear_id: Mapped[str | None] = mapped_column(String(50))
@@ -69,6 +72,10 @@ class Segment(Base):
     city: Mapped[str | None] = mapped_column(String(255))
     country: Mapped[str | None] = mapped_column(String(255))
     climb_category: Mapped[int | None] = mapped_column(Integer)
+    start_latlng_lat: Mapped[float | None] = mapped_column(Float)
+    start_latlng_lng: Mapped[float | None] = mapped_column(Float)
+    end_latlng_lat: Mapped[float | None] = mapped_column(Float)
+    end_latlng_lng: Mapped[float | None] = mapped_column(Float)
 
     efforts: Mapped[list["SegmentEffort"]] = relationship(back_populates="segment")
 

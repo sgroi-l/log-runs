@@ -24,4 +24,6 @@ export const api = {
   segments: (id) => request(`/activities/${id}/segments`),
   segmentHistory: (id, segmentId) =>
     request(`/activities/${id}/segments/${segmentId}/history`),
+  getActivity: (athleteId, activityId) =>
+    request(`/activities/${athleteId}/${activityId}`),
 };

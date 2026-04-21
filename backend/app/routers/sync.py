@@ -34,7 +34,12 @@ def _upsert_activity(db: Session, athlete_id: int, detail: dict):
     activity.suffer_score = detail.get("suffer_score")
     activity.kudos_count = detail.get("kudos_count")
     activity.achievement_count = detail.get("achievement_count")
-    activity.map_summary_polyline = (detail.get("map") or {}).get("summary_polyline")
+    map_data = detail.get("map") or {}
+    activity.map_summary_polyline = map_data.get("summary_polyline")
+    activity.map_polyline = map_data.get("polyline")
+    start_ll = detail.get("start_latlng") or []
+    activity.start_latlng_lat = start_ll[0] if len(start_ll) == 2 else None
+    activity.start_latlng_lng = start_ll[1] if len(start_ll) == 2 else None
     activity.trainer = detail.get("trainer", False)
     activity.commute = detail.get("commute", False)
     activity.gear_id = detail.get("gear_id")
@@ -57,6 +62,12 @@ def _upsert_activity(db: Session, athlete_id: int, detail: dict):
         segment.city = seg_data.get("city")
         segment.country = seg_data.get("country")
         segment.climb_category = seg_data.get("climb_category")
+        start_ll = seg_data.get("start_latlng") or []
+        segment.start_latlng_lat = start_ll[0] if len(start_ll) == 2 else None
+        segment.start_latlng_lng = start_ll[1] if len(start_ll) == 2 else None
+        end_ll = seg_data.get("end_latlng") or []
+        segment.end_latlng_lat = end_ll[0] if len(end_ll) == 2 else None
+        segment.end_latlng_lng = end_ll[1] if len(end_ll) == 2 else None
 
         effort = db.get(SegmentEffort, effort_data["id"])
         if effort is None:

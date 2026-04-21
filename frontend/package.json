@@ -13,7 +13,10 @@
     "react-dom": "^18.3.1",
     "recharts": "^2.12.7",
     "react-router-dom": "^6.23.1",
-    "date-fns": "^3.6.0"
+    "date-fns": "^3.6.0",
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^4.2.1",
+    "@mapbox/polyline": "^1.2.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
