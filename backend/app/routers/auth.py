@@ -11,7 +11,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _redirect_uri(request: Request) -> str:
-    return str(request.base_url) + "auth/callback"
+    return f"{settings.frontend_url}/api/auth/callback"
 
 
 @router.get("/login")

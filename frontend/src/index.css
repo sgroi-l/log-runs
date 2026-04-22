@@ -8,7 +8,7 @@
   --muted: #888;
   --accent: #fc4c02; /* Strava orange */
   --accent-dim: rgba(252, 76, 2, 0.15);
-  --radius: 8px;
+  --radius: 0px;
 }
 
 body {

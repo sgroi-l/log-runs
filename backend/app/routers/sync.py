@@ -1,4 +1,3 @@
-import time
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -46,12 +45,18 @@ def _upsert_activity(db: Session, athlete_id: int, detail: dict):
     activity.description = detail.get("description")
 
     # Segment efforts (included when fetching detail with include_all_efforts=True)
+    seen_segments: dict = {}
     for effort_data in detail.get("segment_efforts", []):
         seg_data = effort_data.get("segment", {})
-        segment = db.get(Segment, seg_data["id"])
-        if segment is None:
-            segment = Segment(id=seg_data["id"])
-            db.add(segment)
+        seg_id = seg_data["id"]
+        if seg_id in seen_segments:
+            segment = seen_segments[seg_id]
+        else:
+            segment = db.get(Segment, seg_id)
+            if segment is None:
+                segment = Segment(id=seg_id)
+                db.add(segment)
+            seen_segments[seg_id] = segment
         segment.name = seg_data.get("name")
         segment.activity_type = seg_data.get("activity_type")
         segment.distance = seg_data.get("distance")
@@ -129,6 +134,11 @@ def _run_sync(athlete_id: int, sync_log_id: int):
         token = strava.get_valid_token(athlete)
         db.commit()
 
+        existing_ids = set(
+            row[0] for row in
+            db.query(Activity.id).filter(Activity.athlete_id == athlete_id).all()
+        )
+
         synced = 0
         page = 1
         while True:
@@ -137,14 +147,13 @@ def _run_sync(athlete_id: int, sync_log_id: int):
                 break
 
             for summary in summaries:
-                # Refresh token before each detail call if needed
+                if summary["id"] in existing_ids:
+                    continue
                 token = strava.get_valid_token(athlete)
                 detail = strava.get_activity_detail(token, summary["id"])
                 _upsert_activity(db, athlete_id, detail)
                 synced += 1
                 db.commit()
-                # Respect rate limits: ~1 req/s is well within 100/15min
-                time.sleep(0.5)
 
             page += 1
 
@@ -153,6 +162,7 @@ def _run_sync(athlete_id: int, sync_log_id: int):
         sync_log.finished_at = datetime.utcnow()
         db.commit()
     except Exception as e:
+        print(f"[sync] error for athlete {athlete_id}: {e}", flush=True)
         db.rollback()
         sync_log = db.get(SyncLog, sync_log_id)
         if sync_log:
