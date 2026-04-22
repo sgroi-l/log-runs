@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Activity, Lap, Segment, SegmentEffort
+from app.models import Activity, BestEffort, Lap, Segment, SegmentEffort
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -200,6 +200,61 @@ def segment_history(athlete_id: int, segment_id: int, db: Session = Depends(get_
             "average_heartrate": e.average_heartrate,
             "pr_rank": e.pr_rank,
             "activity_id": e.activity_id,
+        }
+        for e in efforts
+    ]
+
+
+@router.get("/{athlete_id}/best-efforts/prs")
+def best_effort_prs(athlete_id: int, db: Session = Depends(get_db)):
+    """Best (lowest elapsed_time) effort per distance name, with total effort count."""
+    efforts = (
+        db.query(BestEffort)
+        .filter(BestEffort.athlete_id == athlete_id)
+        .order_by(BestEffort.distance, BestEffort.elapsed_time)
+        .all()
+    )
+    groups: dict[str, list] = {}
+    for e in efforts:
+        if e.name:
+            groups.setdefault(e.name, []).append(e)
+
+    result = []
+    for name, group in sorted(groups.items(), key=lambda x: x[1][0].distance or 0):
+        best = group[0]  # lowest elapsed_time first due to ORDER BY
+        result.append({
+            "name": best.name,
+            "distance_m": best.distance,
+            "elapsed_time": best.elapsed_time,
+            "pace_min_per_km": round((best.elapsed_time / 60) / (best.distance / 1000), 2) if best.distance and best.elapsed_time else None,
+            "activity_id": best.activity_id,
+            "date": best.start_date.isoformat() if best.start_date else None,
+            "pr_rank": best.pr_rank,
+            "total_efforts": len(group),
+        })
+    return result
+
+
+@router.get("/{athlete_id}/best-efforts/history")
+def best_effort_history(
+    athlete_id: int,
+    name: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    """All efforts for a given distance name over time."""
+    efforts = (
+        db.query(BestEffort)
+        .filter(BestEffort.athlete_id == athlete_id, BestEffort.name == name)
+        .order_by(BestEffort.start_date)
+        .all()
+    )
+    return [
+        {
+            "date": e.start_date.isoformat() if e.start_date else None,
+            "elapsed_time": e.elapsed_time,
+            "pace_min_per_km": round((e.elapsed_time / 60) / (e.distance / 1000), 2) if e.distance and e.elapsed_time else None,
+            "activity_id": e.activity_id,
+            "pr_rank": e.pr_rank,
         }
         for e in efforts
     ]
