@@ -142,7 +142,7 @@ class BestEffort(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     activity_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("activities.id"))
     athlete_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("athletes.id"))
-    name: Mapped[str | None] = mapped_column(String(50))
+    name: Mapped[str | None] = mapped_column(Text)
     distance: Mapped[float | None] = mapped_column(Float)       # metres
     elapsed_time: Mapped[int | None] = mapped_column(Integer)   # seconds
     moving_time: Mapped[int | None] = mapped_column(Integer)    # seconds
