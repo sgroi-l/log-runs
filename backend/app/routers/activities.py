@@ -35,6 +35,7 @@ def get_activity(athlete_id: int, activity_id: int, db: Session = Depends(get_db
         .options(
             joinedload(Activity.laps),
             joinedload(Activity.segment_efforts).joinedload(SegmentEffort.segment),
+            joinedload(Activity.best_efforts),
         )
         .filter(Activity.id == activity_id, Activity.athlete_id == athlete_id)
         .first()
@@ -50,6 +51,20 @@ def get_activity(athlete_id: int, activity_id: int, db: Session = Depends(get_db
         if activity.start_latlng_lat is not None else None
     )
     base["description"] = activity.description
+    # Count best efforts per distance name for this athlete (for percentile display)
+    be_counts = dict(
+        db.query(BestEffort.name, func.count(BestEffort.id))
+        .filter(BestEffort.athlete_id == athlete_id)
+        .group_by(BestEffort.name)
+        .all()
+    )
+    # Count segment efforts per segment for this athlete (for percentile display)
+    seg_counts = dict(
+        db.query(SegmentEffort.segment_id, func.count(SegmentEffort.id))
+        .filter(SegmentEffort.athlete_id == athlete_id)
+        .group_by(SegmentEffort.segment_id)
+        .all()
+    )
     base["laps"] = [
         {
             "lap_index": lap.lap_index,
@@ -63,6 +78,18 @@ def get_activity(athlete_id: int, activity_id: int, db: Session = Depends(get_db
         }
         for lap in sorted(activity.laps, key=lambda l: l.lap_index or 0)
     ]
+    base["best_efforts"] = [
+        {
+            "name": be.name,
+            "distance_m": be.distance,
+            "elapsed_time": be.elapsed_time,
+            "moving_time": be.moving_time,
+            "pace_min_per_km": round((be.elapsed_time / 60) / (be.distance / 1000), 2) if be.distance and be.elapsed_time else None,
+            "pr_rank": be.pr_rank,
+            "total_efforts": be_counts.get(be.name, 0),
+        }
+        for be in sorted(activity.best_efforts, key=lambda b: b.distance or 0)
+    ]
     base["segment_efforts"] = [
         {
             "segment_id": e.segment_id,
@@ -72,6 +99,7 @@ def get_activity(athlete_id: int, activity_id: int, db: Session = Depends(get_db
             "average_heartrate": e.average_heartrate,
             "pr_rank": e.pr_rank,
             "kom_rank": e.kom_rank,
+            "total_efforts": seg_counts.get(e.segment_id, 0),
             "segment_start_latlng": (
                 [e.segment.start_latlng_lat, e.segment.start_latlng_lng]
                 if e.segment and e.segment.start_latlng_lat is not None else None
