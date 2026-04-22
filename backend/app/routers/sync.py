@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app import strava
 from app.database import get_db
-from app.models import Activity, Athlete, Lap, Segment, SegmentEffort, SyncLog
+from app.models import Activity, Athlete, BestEffort, Lap, Segment, SegmentEffort, SyncLog
 
 router = APIRouter(prefix="/sync", tags=["sync"])
 
@@ -103,6 +103,21 @@ def _upsert_activity(db: Session, athlete_id: int, detail: dict):
         lap.average_watts = lap_data.get("average_watts")
         lap.average_cadence = lap_data.get("average_cadence")
         lap.total_elevation_gain = lap_data.get("total_elevation_gain")
+
+    # Best efforts
+    for be_data in detail.get("best_efforts", []):
+        be = db.get(BestEffort, be_data["id"])
+        if be is None:
+            be = BestEffort(id=be_data["id"])
+            db.add(be)
+        be.activity_id = activity_id
+        be.athlete_id = athlete_id
+        be.name = be_data.get("name")
+        be.distance = be_data.get("distance")
+        be.elapsed_time = be_data.get("elapsed_time")
+        be.moving_time = be_data.get("moving_time")
+        be.start_date = datetime.fromisoformat(be_data["start_date"].replace("Z", "+00:00")) if be_data.get("start_date") else None
+        be.pr_rank = be_data.get("pr_rank")
 
 
 def _run_sync(athlete_id: int, sync_log_id: int):
