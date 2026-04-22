@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine,
+  Tooltip, ResponsiveContainer,
 } from "recharts";
 import { api } from "../api/client";
+import { formatPrRank, formatElapsedTime } from "../utils";
 import { format, parseISO } from "date-fns";
 
 const SPORT_TYPES = ["Run", "Ride", "Swim", "Walk", "Hike"];
@@ -25,30 +26,46 @@ function formatDuration(secs) {
 const CHART_STYLE = { fontSize: 12 };
 const GRID_STROKE = "#2a2a2a";
 const AXIS_TICK = { fill: "#888", fontSize: 11 };
+const TOOLTIP_STYLE = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)" };
 
 export default function Overview({ athleteId }) {
   const [sportType, setSportType] = useState("Run");
-  const [paceData, setPaceData] = useState([]);
   const [weeklyData, setWeeklyData] = useState([]);
+  const [bestEffortPRs, setBestEffortPRs] = useState([]);
+  const [selectedDistance, setSelectedDistance] = useState(null);
+  const [historyData, setHistoryData] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      api.paceOverTime(athleteId, sportType),
-      api.weeklyVolume(athleteId, sportType),
-    ]).then(([pace, weekly]) => {
-      setPaceData(pace);
-      setWeeklyData(weekly);
+    const promises = [api.weeklyVolume(athleteId, sportType)];
+    if (sportType === "Run") promises.push(api.getBestEffortPRs(athleteId));
+    Promise.all(promises).then((results) => {
+      setWeeklyData(results[0]);
+      if (sportType === "Run" && results[1]) {
+        const prs = results[1];
+        setBestEffortPRs(prs);
+        setSelectedDistance(prs.length > 0 ? prs[0].name : null);
+      } else {
+        setBestEffortPRs([]);
+        setSelectedDistance(null);
+      }
     }).finally(() => setLoading(false));
   }, [athleteId, sportType]);
 
-  const avgPace = paceData.length
-    ? paceData.reduce((s, d) => s + (d.pace_min_per_km || 0), 0) / paceData.length
-    : null;
+  useEffect(() => {
+    if (!selectedDistance) return;
+    setHistoryLoading(true);
+    api.getBestEffortHistory(athleteId, selectedDistance)
+      .then(setHistoryData)
+      .finally(() => setHistoryLoading(false));
+  }, [athleteId, selectedDistance]);
 
   const totalKm = weeklyData.reduce((s, w) => s + (w.distance_km || 0), 0);
+  const totalTime = weeklyData.reduce((s, w) => s + (w.total_time_seconds || 0), 0);
   const totalRuns = weeklyData.reduce((s, w) => s + (w.count || 0), 0);
+  const avgPace = totalKm > 0 ? (totalTime / 60) / totalKm : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -70,49 +87,104 @@ export default function Overview({ athleteId }) {
         <StatCard value={weeklyData.length > 0 ? `${(totalKm / weeklyData.length).toFixed(1)} km` : "-"} label="Avg Weekly km" />
       </div>
 
-      {!loading && paceData.length === 0 && (
+      {!loading && weeklyData.length === 0 && (
         <div className="card" style={{ textAlign: "center", color: "var(--muted)", padding: 48 }}>
           No {sportType} data yet. Hit <strong>Sync Now</strong> to pull your activities.
         </div>
       )}
 
-      {paceData.length > 0 && (
+      {sportType === "Run" && bestEffortPRs.length > 0 && (
         <div className="card">
-          <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Pace Over Time</h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={paceData} style={CHART_STYLE}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
-              <XAxis
-                dataKey="date"
-                tickFormatter={(d) => format(parseISO(d), "MMM yy")}
-                tick={AXIS_TICK}
-                minTickGap={40}
-              />
-              <YAxis
-                reversed
-                domain={["auto", "auto"]}
-                tickFormatter={formatPace}
-                tick={AXIS_TICK}
-                width={70}
-              />
-              {avgPace && (
-                <ReferenceLine y={avgPace} stroke="var(--accent)" strokeDasharray="4 4" label={{ value: "avg", fill: "var(--accent)", fontSize: 11 }} />
+          <h3 style={{ fontWeight: 600, marginBottom: 16 }}>Best Efforts</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+            {/* PR board */}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                    {["Distance", "Time", "Pace", "PR"].map((h) => (
+                      <th key={h} style={{ padding: "6px 10px", textAlign: "left", color: "var(--muted)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {bestEffortPRs.map((pr, i) => (
+                    <tr
+                      key={pr.name}
+                      onClick={() => setSelectedDistance(pr.name)}
+                      style={{
+                        borderBottom: i < bestEffortPRs.length - 1 ? "1px solid var(--border)" : "none",
+                        cursor: "pointer",
+                        background: selectedDistance === pr.name ? "var(--surface)" : "transparent",
+                      }}
+                    >
+                      <td style={{ padding: "6px 10px", fontWeight: 600 }}>{pr.name}</td>
+                      <td style={{ padding: "6px 10px", fontVariantNumeric: "tabular-nums" }}>{formatElapsedTime(pr.elapsed_time)}</td>
+                      <td style={{ padding: "6px 10px", fontVariantNumeric: "tabular-nums" }}>{formatPace(pr.pace_min_per_km)}</td>
+                      <td style={{ padding: "6px 10px" }}>{formatPrRank(pr.pr_rank, pr.total_efforts)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Trend chart */}
+            <div>
+              <div style={{ display: "flex", gap: 2, flexWrap: "wrap", marginBottom: 12 }}>
+                {bestEffortPRs.map((pr) => (
+                  <button
+                    key={pr.name}
+                    onClick={() => setSelectedDistance(pr.name)}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: 12,
+                      background: selectedDistance === pr.name ? "var(--accent)" : "var(--bg)",
+                      color: selectedDistance === pr.name ? "#fff" : "var(--muted)",
+                      border: "1px solid var(--border)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {pr.name}
+                  </button>
+                ))}
+              </div>
+              {historyLoading ? (
+                <div style={{ color: "var(--muted)", padding: 24, textAlign: "center" }}>Loading…</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={240}>
+                  <LineChart data={historyData} style={CHART_STYLE}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={(d) => format(parseISO(d), "MMM yy")}
+                      tick={AXIS_TICK}
+                      minTickGap={40}
+                    />
+                    <YAxis
+                      reversed
+                      domain={["auto", "auto"]}
+                      tickFormatter={formatElapsedTime}
+                      tick={AXIS_TICK}
+                      width={50}
+                    />
+                    <Tooltip
+                      contentStyle={TOOLTIP_STYLE}
+                      labelFormatter={(d) => format(parseISO(d), "d MMM yyyy")}
+                      formatter={(v) => [formatElapsedTime(v), selectedDistance]}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="elapsed_time"
+                      stroke="var(--accent)"
+                      dot={false}
+                      strokeWidth={2}
+                      activeDot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               )}
-              <Tooltip
-                contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)" }}
-                labelFormatter={(d) => format(parseISO(d), "d MMM yyyy")}
-                formatter={(v, name) => [formatPace(v), "Pace"]}
-              />
-              <Line
-                type="monotone"
-                dataKey="pace_min_per_km"
-                stroke="var(--accent)"
-                dot={false}
-                strokeWidth={2}
-                activeDot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       )}
 
