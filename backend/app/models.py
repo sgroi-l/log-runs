@@ -56,6 +56,7 @@ class Activity(Base):
     athlete: Mapped["Athlete"] = relationship(back_populates="activities")
     segment_efforts: Mapped[list["SegmentEffort"]] = relationship(back_populates="activity")
     laps: Mapped[list["Lap"]] = relationship(back_populates="activity")
+    best_efforts: Mapped[list["BestEffort"]] = relationship(back_populates="activity")
 
 
 class Segment(Base):
@@ -133,3 +134,19 @@ class SyncLog(Base):
     error: Mapped[str | None] = mapped_column(Text)
 
     athlete: Mapped["Athlete"] = relationship(back_populates="sync_logs")
+
+
+class BestEffort(Base):
+    __tablename__ = "best_efforts"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    activity_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("activities.id"))
+    athlete_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("athletes.id"))
+    name: Mapped[str | None] = mapped_column(String(50))
+    distance: Mapped[float | None] = mapped_column(Float)       # metres
+    elapsed_time: Mapped[int | None] = mapped_column(Integer)   # seconds
+    moving_time: Mapped[int | None] = mapped_column(Integer)    # seconds
+    start_date: Mapped[datetime | None] = mapped_column(DateTime)
+    pr_rank: Mapped[int | None] = mapped_column(Integer)
+
+    activity: Mapped["Activity"] = relationship(back_populates="best_efforts")
