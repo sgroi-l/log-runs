@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../api/client";
 import RouteMap from "./RouteMap";
 import { format, parseISO } from "date-fns";
+import { formatPrRank } from "../utils";
 
 function formatPace(minPerKm) {
   if (!minPerKm) return "–";
@@ -78,6 +79,33 @@ export default function ActivityDetail({ athleteId, activityId, onClose }) {
             </div>
           )}
 
+          {detail.best_efforts && detail.best_efforts.length > 0 && (
+            <div>
+              <h4 style={{ fontWeight: 600, marginBottom: 10 }}>Best Efforts</h4>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                      {["Distance", "Time", "Pace", "PR"].map((h) => (
+                        <th key={h} style={{ padding: "6px 10px", textAlign: "left", color: "var(--muted)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.best_efforts.map((be, i) => (
+                      <tr key={i} style={{ borderBottom: i < detail.best_efforts.length - 1 ? "1px solid var(--border)" : "none" }}>
+                        <td style={{ padding: "6px 10px", fontWeight: 600 }}>{be.name}</td>
+                        <td style={{ padding: "6px 10px", fontVariantNumeric: "tabular-nums" }}>{formatTime(be.elapsed_time)}</td>
+                        <td style={{ padding: "6px 10px", fontVariantNumeric: "tabular-nums" }}>{be.pace_min_per_km ? `${Math.floor(be.pace_min_per_km)}:${String(Math.round((be.pace_min_per_km % 1) * 60)).padStart(2, "0")} /km` : "–"}</td>
+                        <td style={{ padding: "6px 10px" }}>{formatPrRank(be.pr_rank, be.total_efforts)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {detail.segment_efforts && detail.segment_efforts.length > 0 && (
             <div>
               <h4 style={{ fontWeight: 600, marginBottom: 10 }}>Segments</h4>
@@ -93,15 +121,10 @@ export default function ActivityDetail({ athleteId, activityId, onClose }) {
                   <tbody>
                     {detail.segment_efforts.map((e, i) => (
                       <tr key={i} style={{ borderBottom: i < detail.segment_efforts.length - 1 ? "1px solid var(--border)" : "none" }}>
-                        <td style={{ padding: "6px 10px", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {e.pr_rank === 1 && <span style={{ marginRight: 6, fontSize: 12 }}>🥇</span>}
-                          {e.name}
-                        </td>
+                        <td style={{ padding: "6px 10px", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</td>
                         <td style={{ padding: "6px 10px", fontVariantNumeric: "tabular-nums" }}>{formatTime(e.elapsed_time)}</td>
                         <td style={{ padding: "6px 10px" }}>{e.average_heartrate ? `${Math.round(e.average_heartrate)}` : "–"}</td>
-                        <td style={{ padding: "6px 10px", color: e.pr_rank === 1 ? "#facc15" : "var(--text)" }}>
-                          {e.pr_rank ? `#${e.pr_rank}` : "–"}
-                        </td>
+                        <td style={{ padding: "6px 10px" }}>{formatPrRank(e.pr_rank, e.total_efforts)}</td>
                       </tr>
                     ))}
                   </tbody>
