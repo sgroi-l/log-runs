@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy import exists
 from sqlalchemy.orm import Session
 
 from app import strava
@@ -156,6 +157,27 @@ def _run_sync(athlete_id: int, sync_log_id: int):
                 db.commit()
 
             page += 1
+
+        # Backfill: re-fetch runs that are missing best_efforts (added after initial sync)
+        missing = (
+            db.query(Activity.id)
+            .filter(
+                Activity.athlete_id == athlete_id,
+                Activity.sport_type.ilike("%run%"),
+                ~exists().where(BestEffort.activity_id == Activity.id),
+            )
+            .order_by(Activity.start_date.desc())
+            .all()
+        )
+        backfill_ids = [row[0] for row in missing]
+        if backfill_ids:
+            print(f"[sync] backfilling best_efforts for {len(backfill_ids)} runs", flush=True)
+        for activity_id in backfill_ids:
+            token = strava.get_valid_token(athlete)
+            detail = strava.get_activity_detail(token, activity_id)
+            _upsert_activity(db, athlete_id, detail)
+            synced += 1
+            db.commit()
 
         sync_log.status = "done"
         sync_log.activities_synced = synced

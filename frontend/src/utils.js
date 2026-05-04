@@ -2,7 +2,8 @@ export function formatPrRank(prRank, totalEfforts) {
   if (prRank === 1) return "🥇";
   if (prRank === 2) return "🥈";
   if (prRank === 3) return "🥉";
-  if (prRank >= 4 && totalEfforts) return `top ${Math.round((prRank / totalEfforts) * 100)}%`;
+  if (prRank >= 4 && totalEfforts) return `${prRank}/${totalEfforts}`;
+  if (prRank >= 4) return `#${prRank}`;
   return "–";
 }
 

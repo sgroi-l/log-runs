@@ -4,6 +4,7 @@ import {
 } from "recharts";
 import { api } from "../api/client";
 import { format, parseISO } from "date-fns";
+import { formatPrRank } from "../utils";
 
 function formatTime(secs) {
   if (!secs) return "-";
@@ -143,7 +144,7 @@ export default function SegmentsPage({ athleteId }) {
                         {e.elapsed_time === prTime && <span className="badge" style={{ marginLeft: 8 }}>PR</span>}
                       </td>
                       <td style={{ padding: "10px 14px" }}>{e.average_heartrate ? `${Math.round(e.average_heartrate)} bpm` : "-"}</td>
-                      <td style={{ padding: "10px 14px" }}>{e.pr_rank ? `#${e.pr_rank}` : "-"}</td>
+                      <td style={{ padding: "10px 14px" }}>{formatPrRank(e.pr_rank, e.total_efforts)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -8,6 +8,58 @@ from app.models import Activity, BestEffort, Lap, Segment, SegmentEffort
 router = APIRouter(prefix="/activities", tags=["activities"])
 
 
+def _rank_best_efforts(db: Session, athlete_id: int):
+    """Return (rank_by_effort_id, total_by_name) for all of this athlete's best efforts,
+    ranked by elapsed_time asc, ties sharing the min rank."""
+    rows = (
+        db.query(BestEffort.id, BestEffort.name, BestEffort.elapsed_time)
+        .filter(BestEffort.athlete_id == athlete_id)
+        .all()
+    )
+    groups: dict[str, list] = {}
+    for r in rows:
+        groups.setdefault(r.name, []).append((r.elapsed_time or 10**12, r.id))
+    rank_of: dict[int, int] = {}
+    total_of: dict[str, int] = {}
+    for name, items in groups.items():
+        items.sort()
+        prev_time = None
+        prev_rank = 0
+        for i, (t, eid) in enumerate(items, start=1):
+            if t != prev_time:
+                prev_rank = i
+                prev_time = t
+            rank_of[eid] = prev_rank
+        total_of[name] = len(items)
+    return rank_of, total_of
+
+
+def _rank_segment_efforts(db: Session, athlete_id: int, segment_id: int | None = None):
+    """Return (rank_by_effort_id, total_by_segment_id) ranked by elapsed_time asc."""
+    q = db.query(SegmentEffort.id, SegmentEffort.segment_id, SegmentEffort.elapsed_time).filter(
+        SegmentEffort.athlete_id == athlete_id
+    )
+    if segment_id is not None:
+        q = q.filter(SegmentEffort.segment_id == segment_id)
+    rows = q.all()
+    groups: dict[int, list] = {}
+    for r in rows:
+        groups.setdefault(r.segment_id, []).append((r.elapsed_time or 10**12, r.id))
+    rank_of: dict[int, int] = {}
+    total_of: dict[int, int] = {}
+    for sid, items in groups.items():
+        items.sort()
+        prev_time = None
+        prev_rank = 0
+        for i, (t, eid) in enumerate(items, start=1):
+            if t != prev_time:
+                prev_rank = i
+                prev_time = t
+            rank_of[eid] = prev_rank
+        total_of[sid] = len(items)
+    return rank_of, total_of
+
+
 @router.get("/{athlete_id}")
 def list_activities(
     athlete_id: int,
@@ -28,91 +80,8 @@ def list_activities(
     }
 
 
-@router.get("/{athlete_id}/{activity_id}")
-def get_activity(athlete_id: int, activity_id: int, db: Session = Depends(get_db)):
-    activity = (
-        db.query(Activity)
-        .options(
-            joinedload(Activity.laps),
-            joinedload(Activity.segment_efforts).joinedload(SegmentEffort.segment),
-            joinedload(Activity.best_efforts),
-        )
-        .filter(Activity.id == activity_id, Activity.athlete_id == athlete_id)
-        .first()
-    )
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-
-    base = _activity_dict(activity)
-    base["map_polyline"] = activity.map_polyline
-    base["map_summary_polyline"] = activity.map_summary_polyline
-    base["start_latlng"] = (
-        [activity.start_latlng_lat, activity.start_latlng_lng]
-        if activity.start_latlng_lat is not None else None
-    )
-    base["description"] = activity.description
-    # Count best efforts per distance name for this athlete (for percentile display)
-    be_counts = dict(
-        db.query(BestEffort.name, func.count(BestEffort.id))
-        .filter(BestEffort.athlete_id == athlete_id)
-        .group_by(BestEffort.name)
-        .all()
-    )
-    # Count segment efforts per segment for this athlete (for percentile display)
-    seg_counts = dict(
-        db.query(SegmentEffort.segment_id, func.count(SegmentEffort.id))
-        .filter(SegmentEffort.athlete_id == athlete_id)
-        .group_by(SegmentEffort.segment_id)
-        .all()
-    )
-    base["laps"] = [
-        {
-            "lap_index": lap.lap_index,
-            "name": lap.name,
-            "distance_km": round(lap.distance / 1000, 2) if lap.distance else None,
-            "moving_time": lap.moving_time,
-            "average_speed": lap.average_speed,
-            "pace_min_per_km": round((1000 / lap.average_speed) / 60, 2) if lap.average_speed else None,
-            "average_heartrate": lap.average_heartrate,
-            "total_elevation_gain": lap.total_elevation_gain,
-        }
-        for lap in sorted(activity.laps, key=lambda l: l.lap_index or 0)
-    ]
-    base["best_efforts"] = [
-        {
-            "name": be.name,
-            "distance_m": be.distance,
-            "elapsed_time": be.elapsed_time,
-            "moving_time": be.moving_time,
-            "pace_min_per_km": round((be.elapsed_time / 60) / (be.distance / 1000), 2) if be.distance and be.elapsed_time else None,
-            "pr_rank": be.pr_rank,
-            "total_efforts": be_counts.get(be.name, 0),
-        }
-        for be in sorted(activity.best_efforts, key=lambda b: b.distance or 0)
-    ]
-    base["segment_efforts"] = [
-        {
-            "segment_id": e.segment_id,
-            "name": e.name,
-            "elapsed_time": e.elapsed_time,
-            "distance_m": e.distance,
-            "average_heartrate": e.average_heartrate,
-            "pr_rank": e.pr_rank,
-            "kom_rank": e.kom_rank,
-            "total_efforts": seg_counts.get(e.segment_id, 0),
-            "segment_start_latlng": (
-                [e.segment.start_latlng_lat, e.segment.start_latlng_lng]
-                if e.segment and e.segment.start_latlng_lat is not None else None
-            ),
-            "segment_end_latlng": (
-                [e.segment.end_latlng_lat, e.segment.end_latlng_lng]
-                if e.segment and e.segment.end_latlng_lat is not None else None
-            ),
-        }
-        for e in sorted(activity.segment_efforts, key=lambda e: e.start_date or activity.start_date)
-    ]
-    return base
-
+# Literal sub-routes must be registered before /{athlete_id}/{activity_id}
+# so Starlette's registration-order matching doesn't swallow them.
 
 @router.get("/{athlete_id}/pace-over-time")
 def pace_over_time(
@@ -120,7 +89,6 @@ def pace_over_time(
     sport_type: str = "Run",
     db: Session = Depends(get_db),
 ):
-    """Returns date + pace (min/km) for all activities of a given sport type."""
     activities = (
         db.query(Activity)
         .filter(
@@ -150,7 +118,6 @@ def weekly_volume(
     sport_type: str = "Run",
     db: Session = Depends(get_db),
 ):
-    """Weekly distance totals (km) grouped by ISO week."""
     rows = (
         db.query(
             func.date_trunc("week", Activity.start_date).label("week"),
@@ -179,7 +146,6 @@ def weekly_volume(
 
 @router.get("/{athlete_id}/segments")
 def athlete_segments(athlete_id: int, db: Session = Depends(get_db)):
-    """All segments the athlete has efforts on, with PR time."""
     rows = (
         db.query(
             Segment.id,
@@ -210,7 +176,6 @@ def athlete_segments(athlete_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{athlete_id}/segments/{segment_id}/history")
 def segment_history(athlete_id: int, segment_id: int, db: Session = Depends(get_db)):
-    """All efforts on a segment over time."""
     efforts = (
         db.query(SegmentEffort)
         .filter(
@@ -220,13 +185,16 @@ def segment_history(athlete_id: int, segment_id: int, db: Session = Depends(get_
         .order_by(SegmentEffort.start_date)
         .all()
     )
+    rank_of, total_of = _rank_segment_efforts(db, athlete_id, segment_id)
+    total = total_of.get(segment_id, 0)
     return [
         {
             "date": e.start_date.isoformat() if e.start_date else None,
             "elapsed_time": e.elapsed_time,
             "moving_time": e.moving_time,
             "average_heartrate": e.average_heartrate,
-            "pr_rank": e.pr_rank,
+            "pr_rank": rank_of.get(e.id),
+            "total_efforts": total,
             "activity_id": e.activity_id,
         }
         for e in efforts
@@ -235,7 +203,6 @@ def segment_history(athlete_id: int, segment_id: int, db: Session = Depends(get_
 
 @router.get("/{athlete_id}/best-efforts/prs")
 def best_effort_prs(athlete_id: int, db: Session = Depends(get_db)):
-    """Best (lowest elapsed_time) effort per distance name, with total effort count."""
     efforts = (
         db.query(BestEffort)
         .filter(BestEffort.athlete_id == athlete_id)
@@ -269,23 +236,99 @@ def best_effort_history(
     name: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    """All efforts for a given distance name over time."""
     efforts = (
         db.query(BestEffort)
         .filter(BestEffort.athlete_id == athlete_id, BestEffort.name == name)
         .order_by(BestEffort.start_date)
         .all()
     )
+    rank_of, total_of = _rank_best_efforts(db, athlete_id)
+    total = total_of.get(name, 0)
     return [
         {
             "date": e.start_date.isoformat() if e.start_date else None,
             "elapsed_time": e.elapsed_time,
             "pace_min_per_km": round((e.elapsed_time / 60) / (e.distance / 1000), 2) if e.distance and e.elapsed_time else None,
             "activity_id": e.activity_id,
-            "pr_rank": e.pr_rank,
+            "pr_rank": rank_of.get(e.id),
+            "total_efforts": total,
         }
         for e in efforts
     ]
+
+
+@router.get("/{athlete_id}/{activity_id}")
+def get_activity(athlete_id: int, activity_id: int, db: Session = Depends(get_db)):
+    activity = (
+        db.query(Activity)
+        .options(
+            joinedload(Activity.laps),
+            joinedload(Activity.segment_efforts).joinedload(SegmentEffort.segment),
+            joinedload(Activity.best_efforts),
+        )
+        .filter(Activity.id == activity_id, Activity.athlete_id == athlete_id)
+        .first()
+    )
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    base = _activity_dict(activity)
+    base["map_polyline"] = activity.map_polyline
+    base["map_summary_polyline"] = activity.map_summary_polyline
+    base["start_latlng"] = (
+        [activity.start_latlng_lat, activity.start_latlng_lng]
+        if activity.start_latlng_lat is not None else None
+    )
+    base["description"] = activity.description
+    be_rank_of, be_total_of = _rank_best_efforts(db, athlete_id)
+    seg_rank_of, seg_total_of = _rank_segment_efforts(db, athlete_id)
+    base["laps"] = [
+        {
+            "lap_index": lap.lap_index,
+            "name": lap.name,
+            "distance_km": round(lap.distance / 1000, 2) if lap.distance else None,
+            "moving_time": lap.moving_time,
+            "average_speed": lap.average_speed,
+            "pace_min_per_km": round((1000 / lap.average_speed) / 60, 2) if lap.average_speed else None,
+            "average_heartrate": lap.average_heartrate,
+            "total_elevation_gain": lap.total_elevation_gain,
+        }
+        for lap in sorted(activity.laps, key=lambda l: l.lap_index or 0)
+    ]
+    base["best_efforts"] = [
+        {
+            "name": be.name,
+            "distance_m": be.distance,
+            "elapsed_time": be.elapsed_time,
+            "moving_time": be.moving_time,
+            "pace_min_per_km": round((be.elapsed_time / 60) / (be.distance / 1000), 2) if be.distance and be.elapsed_time else None,
+            "pr_rank": be_rank_of.get(be.id),
+            "total_efforts": be_total_of.get(be.name, 0),
+        }
+        for be in sorted(activity.best_efforts, key=lambda b: b.distance or 0)
+    ]
+    base["segment_efforts"] = [
+        {
+            "segment_id": e.segment_id,
+            "name": e.name,
+            "elapsed_time": e.elapsed_time,
+            "distance_m": e.distance,
+            "average_heartrate": e.average_heartrate,
+            "pr_rank": seg_rank_of.get(e.id),
+            "kom_rank": e.kom_rank,
+            "total_efforts": seg_total_of.get(e.segment_id, 0),
+            "segment_start_latlng": (
+                [e.segment.start_latlng_lat, e.segment.start_latlng_lng]
+                if e.segment and e.segment.start_latlng_lat is not None else None
+            ),
+            "segment_end_latlng": (
+                [e.segment.end_latlng_lat, e.segment.end_latlng_lng]
+                if e.segment and e.segment.end_latlng_lat is not None else None
+            ),
+        }
+        for e in sorted(activity.segment_efforts, key=lambda e: e.start_date or activity.start_date)
+    ]
+    return base
 
 
 def _activity_dict(a: Activity) -> dict:

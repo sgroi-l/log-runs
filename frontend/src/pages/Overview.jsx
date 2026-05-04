@@ -4,10 +4,19 @@ import {
   Tooltip, ResponsiveContainer,
 } from "recharts";
 import { api } from "../api/client";
-import { formatPrRank, formatElapsedTime } from "../utils";
+import { formatElapsedTime } from "../utils";
 import { format, parseISO } from "date-fns";
 
 const SPORT_TYPES = ["Run", "Ride", "Swim", "Walk", "Hike"];
+
+const TIME_PERIODS = [
+  { label: "1W", days: 7 },
+  { label: "1M", days: 30 },
+  { label: "3M", days: 90 },
+  { label: "6M", days: 180 },
+  { label: "1Y", days: 365 },
+  { label: "All", days: null },
+];
 
 function formatPace(minPerKm) {
   if (!minPerKm) return "-";
@@ -35,6 +44,7 @@ export default function Overview({ athleteId }) {
   const [selectedDistance, setSelectedDistance] = useState(null);
   const [historyData, setHistoryData] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPeriod, setHistoryPeriod] = useState("All");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -61,6 +71,11 @@ export default function Overview({ athleteId }) {
       .then(setHistoryData)
       .finally(() => setHistoryLoading(false));
   }, [athleteId, selectedDistance]);
+
+  const periodDays = TIME_PERIODS.find((p) => p.label === historyPeriod)?.days;
+  const filteredHistory = periodDays
+    ? historyData.filter((d) => (Date.now() - new Date(d.date).getTime()) / 86400000 <= periodDays)
+    : historyData;
 
   const totalKm = weeklyData.reduce((s, w) => s + (w.distance_km || 0), 0);
   const totalTime = weeklyData.reduce((s, w) => s + (w.total_time_seconds || 0), 0);
@@ -102,7 +117,7 @@ export default function Overview({ athleteId }) {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    {["Distance", "Time", "Pace", "PR"].map((h) => (
+                    {["Distance", "Time", "Pace", "Date"].map((h) => (
                       <th key={h} style={{ padding: "6px 10px", textAlign: "left", color: "var(--muted)", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
                     ))}
                   </tr>
@@ -121,7 +136,7 @@ export default function Overview({ athleteId }) {
                       <td style={{ padding: "6px 10px", fontWeight: 600 }}>{pr.name}</td>
                       <td style={{ padding: "6px 10px", fontVariantNumeric: "tabular-nums" }}>{formatElapsedTime(pr.elapsed_time)}</td>
                       <td style={{ padding: "6px 10px", fontVariantNumeric: "tabular-nums" }}>{formatPace(pr.pace_min_per_km)}</td>
-                      <td style={{ padding: "6px 10px" }}>{formatPrRank(pr.pr_rank, pr.total_efforts)}</td>
+                      <td style={{ padding: "6px 10px", color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{pr.date ? new Date(pr.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "–"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -148,11 +163,29 @@ export default function Overview({ athleteId }) {
                   </button>
                 ))}
               </div>
+              <div style={{ display: "flex", gap: 2, flexWrap: "wrap", marginBottom: 8 }}>
+                {TIME_PERIODS.map((p) => (
+                  <button
+                    key={p.label}
+                    onClick={() => setHistoryPeriod(p.label)}
+                    style={{
+                      padding: "3px 8px",
+                      fontSize: 11,
+                      background: historyPeriod === p.label ? "var(--accent-dim)" : "var(--bg)",
+                      color: historyPeriod === p.label ? "#fff" : "var(--muted)",
+                      border: "1px solid var(--border)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
               {historyLoading ? (
                 <div style={{ color: "var(--muted)", padding: 24, textAlign: "center" }}>Loading…</div>
               ) : (
                 <ResponsiveContainer width="100%" height={240}>
-                  <LineChart data={historyData} style={CHART_STYLE}>
+                  <LineChart data={filteredHistory} style={CHART_STYLE}>
                     <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
                     <XAxis
                       dataKey="date"
