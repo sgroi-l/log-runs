@@ -1,0 +1,9 @@
+app = "run-sgroi-api"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
