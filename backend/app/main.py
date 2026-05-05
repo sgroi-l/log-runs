@@ -3,12 +3,18 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy import text
+
 from app.config import settings
 from app.database import engine, SessionLocal
 from app.models import Base, SyncLog
 from app.routers import activities, auth, sync
 
 Base.metadata.create_all(bind=engine)
+
+# Lightweight column additions for existing databases (no migrations framework).
+with engine.begin() as conn:
+    conn.execute(text("ALTER TABLE segments ADD COLUMN IF NOT EXISTS map_polyline TEXT"))
 
 # Clear any syncs that were running when the server last shut down
 with SessionLocal() as db:

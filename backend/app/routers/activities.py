@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app import strava
 from app.database import get_db
-from app.models import Activity, BestEffort, Lap, Segment, SegmentEffort
+from app.models import Activity, Athlete, BestEffort, Lap, Segment, SegmentEffort
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -154,6 +155,7 @@ def athlete_segments(athlete_id: int, db: Session = Depends(get_db)):
             Segment.average_grade,
             func.min(SegmentEffort.elapsed_time).label("pr_seconds"),
             func.count(SegmentEffort.id).label("effort_count"),
+            func.max(SegmentEffort.start_date).label("last_effort_date"),
         )
         .join(SegmentEffort, SegmentEffort.segment_id == Segment.id)
         .filter(SegmentEffort.athlete_id == athlete_id)
@@ -169,6 +171,7 @@ def athlete_segments(athlete_id: int, db: Session = Depends(get_db)):
             "average_grade": r.average_grade,
             "pr_seconds": r.pr_seconds,
             "effort_count": r.effort_count,
+            "last_effort_date": r.last_effort_date.isoformat() if r.last_effort_date else None,
         }
         for r in rows
     ]
@@ -199,6 +202,35 @@ def segment_history(athlete_id: int, segment_id: int, db: Session = Depends(get_
         }
         for e in efforts
     ]
+
+
+@router.get("/{athlete_id}/segments/{segment_id}/map")
+def segment_map(athlete_id: int, segment_id: int, db: Session = Depends(get_db)):
+    segment = db.get(Segment, segment_id)
+    if not segment:
+        raise HTTPException(status_code=404, detail="Segment not found")
+    if not segment.map_polyline:
+        athlete = db.get(Athlete, athlete_id)
+        if not athlete:
+            raise HTTPException(status_code=404, detail="Athlete not found")
+        token = strava.get_valid_token(athlete)
+        data = strava.get_segment(token, segment_id)
+        polyline = (data.get("map") or {}).get("polyline")
+        if polyline:
+            segment.map_polyline = polyline
+            db.commit()
+    return {
+        "segment_id": segment_id,
+        "polyline": segment.map_polyline,
+        "start_latlng": (
+            [segment.start_latlng_lat, segment.start_latlng_lng]
+            if segment.start_latlng_lat is not None else None
+        ),
+        "end_latlng": (
+            [segment.end_latlng_lat, segment.end_latlng_lng]
+            if segment.end_latlng_lat is not None else None
+        ),
+    }
 
 
 @router.get("/{athlete_id}/best-efforts/prs")

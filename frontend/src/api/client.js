@@ -24,6 +24,8 @@ export const api = {
   segments: (id) => request(`/activities/${id}/segments`),
   segmentHistory: (id, segmentId) =>
     request(`/activities/${id}/segments/${segmentId}/history`),
+  segmentMap: (id, segmentId) =>
+    request(`/activities/${id}/segments/${segmentId}/map`),
   getActivity: (athleteId, activityId) =>
     request(`/activities/${athleteId}/${activityId}`),
   getBestEffortPRs: (athleteId) =>

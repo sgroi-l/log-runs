@@ -107,6 +107,14 @@ def get_activities(access_token: str, page: int = 1, per_page: int = 100, after:
     ).json()
 
 
+def get_segment(access_token: str, segment_id: int) -> dict:
+    return _get(
+        f"{STRAVA_API_BASE}/segments/{segment_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=30,
+    ).json()
+
+
 def get_activity_detail(access_token: str, activity_id: int) -> dict:
     return _get(
         f"{STRAVA_API_BASE}/activities/{activity_id}",

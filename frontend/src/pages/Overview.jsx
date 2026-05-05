@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { api } from "../api/client";
 import { formatElapsedTime } from "../utils";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfWeek, addWeeks } from "date-fns";
 
 const SPORT_TYPES = ["Run", "Ride", "Swim", "Walk", "Hike"];
 
@@ -17,6 +17,38 @@ const TIME_PERIODS = [
   { label: "1Y", days: 365 },
   { label: "All", days: null },
 ];
+
+const WEEKLY_RANGES = [
+  { label: "12W", weeks: 12 },
+  { label: "26W", weeks: 26 },
+  { label: "52W", weeks: 52 },
+  { label: "All", weeks: null },
+];
+
+function buildWeeklySeries(rows, weeks) {
+  const map = new Map(rows.map((r) => [r.week.slice(0, 10), r]));
+  if (weeks === null) {
+    if (rows.length === 0) return [];
+    const first = startOfWeek(parseISO(rows[0].week), { weekStartsOn: 1 });
+    const last = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const out = [];
+    for (let d = first; d <= last; d = addWeeks(d, 1)) {
+      const key = format(d, "yyyy-MM-dd");
+      const row = map.get(key);
+      out.push({ week: d.toISOString(), distance_km: row?.distance_km ?? 0 });
+    }
+    return out;
+  }
+  const end = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const out = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const d = addWeeks(end, -i);
+    const key = format(d, "yyyy-MM-dd");
+    const row = map.get(key);
+    out.push({ week: d.toISOString(), distance_km: row?.distance_km ?? 0 });
+  }
+  return out;
+}
 
 function formatPace(minPerKm) {
   if (!minPerKm) return "-";
@@ -45,6 +77,7 @@ export default function Overview({ athleteId }) {
   const [historyData, setHistoryData] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyPeriod, setHistoryPeriod] = useState("All");
+  const [weeklyRange, setWeeklyRange] = useState("26W");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -221,11 +254,34 @@ export default function Overview({ athleteId }) {
         </div>
       )}
 
-      {weeklyData.length > 0 && (
+      {weeklyData.length > 0 && (() => {
+        const rangeWeeks = WEEKLY_RANGES.find((r) => r.label === weeklyRange)?.weeks;
+        const series = buildWeeklySeries(weeklyData, rangeWeeks ?? null);
+        return (
         <div className="card">
-          <h3 style={{ marginBottom: 16, fontWeight: 600 }}>Weekly Distance (km)</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h3 style={{ fontWeight: 600 }}>Weekly Distance (km)</h3>
+            <div style={{ display: "flex", gap: 2 }}>
+              {WEEKLY_RANGES.map((r) => (
+                <button
+                  key={r.label}
+                  onClick={() => setWeeklyRange(r.label)}
+                  style={{
+                    padding: "3px 8px",
+                    fontSize: 11,
+                    background: weeklyRange === r.label ? "var(--accent-dim)" : "var(--bg)",
+                    color: weeklyRange === r.label ? "#fff" : "var(--muted)",
+                    border: "1px solid var(--border)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={weeklyData} style={CHART_STYLE}>
+            <BarChart data={series} style={CHART_STYLE}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
               <XAxis
                 dataKey="week"
@@ -243,7 +299,8 @@ export default function Overview({ athleteId }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

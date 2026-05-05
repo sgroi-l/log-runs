@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import RouteMap from "./RouteMap";
 import { format, parseISO } from "date-fns";
@@ -121,7 +122,11 @@ export default function ActivityDetail({ athleteId, activityId, onClose }) {
                   <tbody>
                     {detail.segment_efforts.map((e, i) => (
                       <tr key={i} style={{ borderBottom: i < detail.segment_efforts.length - 1 ? "1px solid var(--border)" : "none" }}>
-                        <td style={{ padding: "6px 10px", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</td>
+                        <td style={{ padding: "6px 10px", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {e.segment_id ? (
+                            <Link to={`/segments?segment=${e.segment_id}`} style={{ color: "var(--accent)", textDecoration: "none" }}>{e.name}</Link>
+                          ) : e.name}
+                        </td>
                         <td style={{ padding: "6px 10px", fontVariantNumeric: "tabular-nums" }}>{formatTime(e.elapsed_time)}</td>
                         <td style={{ padding: "6px 10px" }}>{e.average_heartrate ? `${Math.round(e.average_heartrate)}` : "–"}</td>
                         <td style={{ padding: "6px 10px" }}>{formatPrRank(e.pr_rank, e.total_efforts)}</td>

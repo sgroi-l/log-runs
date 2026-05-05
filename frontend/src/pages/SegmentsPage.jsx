@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import { api } from "../api/client";
 import { format, parseISO } from "date-fns";
 import { formatPrRank } from "../utils";
+import RouteMap from "../components/RouteMap";
 
 function formatTime(secs) {
   if (!secs) return "-";
@@ -16,20 +18,80 @@ function formatTime(secs) {
 const AXIS_TICK = { fill: "#888", fontSize: 11 };
 const GRID_STROKE = "#2a2a2a";
 
+const SORT_OPTIONS = [
+  { value: "attempts", label: "Most attempts" },
+  { value: "recent", label: "Most recent" },
+  { value: "name", label: "Name" },
+  { value: "distance", label: "Distance" },
+  { value: "pr", label: "Fastest PR" },
+];
+
+function sortSegments(segments, sortBy) {
+  const nullsLast = (a, b, getter, dir = 1) => {
+    const va = getter(a);
+    const vb = getter(b);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (va < vb) return -1 * dir;
+    if (va > vb) return 1 * dir;
+    return 0;
+  };
+  const copy = [...segments];
+  switch (sortBy) {
+    case "recent":
+      return copy.sort((a, b) => nullsLast(a, b, (s) => s.last_effort_date, -1));
+    case "name":
+      return copy.sort((a, b) => nullsLast(a, b, (s) => s.name?.toLowerCase(), 1));
+    case "distance":
+      return copy.sort((a, b) => nullsLast(a, b, (s) => s.distance_m, -1));
+    case "pr":
+      return copy.sort((a, b) => nullsLast(a, b, (s) => s.pr_seconds, 1));
+    case "attempts":
+    default:
+      return copy.sort((a, b) => nullsLast(a, b, (s) => s.effort_count, -1));
+  }
+}
+
 export default function SegmentsPage({ athleteId }) {
   const [segments, setSegments] = useState([]);
   const [selected, setSelected] = useState(null);
   const [history, setHistory] = useState([]);
+  const [map, setMap] = useState(null);
+  const [sortBy, setSortBy] = useState("attempts");
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     api.segments(athleteId).then(setSegments);
   }, [athleteId]);
 
-  const handleSelect = async (seg) => {
+  const sortedSegments = useMemo(() => sortSegments(segments, sortBy), [segments, sortBy]);
+
+  const loadSegment = async (seg) => {
     setSelected(seg);
-    const h = await api.segmentHistory(athleteId, seg.segment_id);
+    setHistory([]);
+    setMap(null);
+    const [h, m] = await Promise.all([
+      api.segmentHistory(athleteId, seg.segment_id),
+      api.segmentMap(athleteId, seg.segment_id).catch(() => null),
+    ]);
     setHistory(h);
+    setMap(m);
   };
+
+  const handleSelect = (seg) => {
+    setSearchParams({ segment: String(seg.segment_id) }, { replace: true });
+    loadSegment(seg);
+  };
+
+  // Auto-select from ?segment=ID once segments are loaded
+  useEffect(() => {
+    const id = searchParams.get("segment");
+    if (!id || segments.length === 0) return;
+    if (selected?.segment_id === Number(id)) return;
+    const seg = segments.find((s) => s.segment_id === Number(id));
+    if (seg) loadSegment(seg);
+  }, [searchParams, segments]);
 
   const prTime = history.length ? Math.min(...history.map((h) => h.elapsed_time).filter(Boolean)) : null;
 
@@ -39,8 +101,26 @@ export default function SegmentsPage({ athleteId }) {
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
           Segments <span style={{ color: "var(--muted)", fontSize: 14 }}>({segments.length})</span>
         </h2>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          style={{
+            width: "100%",
+            marginBottom: 12,
+            padding: "8px 10px",
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            color: "var(--text)",
+            fontSize: 13,
+          }}
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>Sort: {opt.label}</option>
+          ))}
+        </select>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {segments.map((seg) => (
+          {sortedSegments.map((seg) => (
             <button
               key={seg.segment_id}
               onClick={() => handleSelect(seg)}
@@ -93,6 +173,12 @@ export default function SegmentsPage({ athleteId }) {
                 <div className="stat-label">Avg Time</div>
               </div>
             </div>
+
+            {map?.polyline && (
+              <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+                <RouteMap polyline={map.polyline} height="320px" />
+              </div>
+            )}
 
             {history.length > 1 && (
               <div className="card">

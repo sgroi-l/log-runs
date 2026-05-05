@@ -77,6 +77,7 @@ class Segment(Base):
     start_latlng_lng: Mapped[float | None] = mapped_column(Float)
     end_latlng_lat: Mapped[float | None] = mapped_column(Float)
     end_latlng_lng: Mapped[float | None] = mapped_column(Float)
+    map_polyline: Mapped[str | None] = mapped_column(Text)
 
     efforts: Mapped[list["SegmentEffort"]] = relationship(back_populates="segment")
 
