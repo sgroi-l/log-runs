@@ -20,11 +20,11 @@ export default function Dashboard({ athleteId, onLogout }) {
   }, [athleteId]);
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 16px" }}>
-      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0", borderBottom: "1px solid var(--border)", marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+    <div className="app-shell">
+      <header className="header">
+        <div className="header-left">
           <span style={{ fontWeight: 800, fontSize: 18 }}>Log Runs</span>
-          <nav style={{ display: "flex", gap: 4 }}>
+          <nav style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
             {NAV.map(({ to, label, end }) => (
               <NavLink
                 key={to}
@@ -43,13 +43,13 @@ export default function Dashboard({ athleteId, onLogout }) {
             ))}
           </nav>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="header-right">
           {athlete && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
               {athlete.profile_medium && (
                 <img src={athlete.profile_medium} alt="" style={{ width: 28, height: 28, borderRadius: "50%" }} />
               )}
-              <span style={{ color: "var(--muted)" }}>{athlete.firstname} {athlete.lastname}</span>
+              <span className="header-name">{athlete.firstname} {athlete.lastname}</span>
             </div>
           )}
           <SyncButton athleteId={athleteId} />

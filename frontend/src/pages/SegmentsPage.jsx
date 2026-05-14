@@ -96,8 +96,8 @@ export default function SegmentsPage({ athleteId }) {
   const prTime = history.length ? Math.min(...history.map((h) => h.elapsed_time).filter(Boolean)) : null;
 
   return (
-    <div style={{ display: "flex", gap: 24 }}>
-      <div style={{ width: 320, flexShrink: 0 }}>
+    <div className="segments-layout">
+      <div className="segments-list">
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
           Segments <span style={{ color: "var(--muted)", fontSize: 14 }}>({segments.length})</span>
         </h2>
@@ -119,7 +119,7 @@ export default function SegmentsPage({ athleteId }) {
             <option key={opt.value} value={opt.value}>Sort: {opt.label}</option>
           ))}
         </select>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div className="segments-list-buttons" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {sortedSegments.map((seg) => (
             <button
               key={seg.segment_id}
@@ -148,7 +148,7 @@ export default function SegmentsPage({ athleteId }) {
         </div>
       </div>
 
-      <div style={{ flex: 1 }}>
+      <div className="segments-detail">
         {selected ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>

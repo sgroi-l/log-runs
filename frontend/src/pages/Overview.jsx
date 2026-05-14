@@ -144,7 +144,7 @@ export default function Overview({ athleteId }) {
       {sportType === "Run" && bestEffortPRs.length > 0 && (
         <div className="card">
           <h3 style={{ fontWeight: 600, marginBottom: 16 }}>Best Efforts</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+          <div className="best-efforts-grid">
             {/* PR board */}
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>

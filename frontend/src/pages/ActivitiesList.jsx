@@ -67,11 +67,8 @@ export default function ActivitiesList({ athleteId }) {
           <React.Fragment key={a.id}>
             <div
               onClick={() => handleRowClick(a.id)}
+              className="activities-row"
               style={{
-                display: "grid",
-                gridTemplateColumns: "90px 1fr 80px 80px 70px 70px 60px 50px",
-                alignItems: "center",
-                gap: 8,
                 padding: "10px 14px",
                 background: expandedId === a.id ? "var(--accent-dim)" : "var(--surface)",
                 border: `1px solid ${expandedId === a.id ? "var(--accent)" : "var(--border)"}`,
@@ -86,12 +83,12 @@ export default function ActivitiesList({ athleteId }) {
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>
                 {a.name || "–"}
               </span>
-              <span><span className="badge">{a.sport_type || "–"}</span></span>
-              <span style={{ fontSize: 13 }}>{a.distance_km ? `${a.distance_km} km` : "–"}</span>
-              <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{formatDuration(a.moving_time)}</span>
-              <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{formatPace(a.pace_min_per_km)}</span>
-              <span style={{ fontSize: 13 }}>{a.average_heartrate ? `${Math.round(a.average_heartrate)}` : "–"}</span>
-              <span style={{ fontSize: 13 }}>{a.total_elevation_gain ? `${Math.round(a.total_elevation_gain)}m` : "–"}</span>
+              <span className="col-hide-narrow"><span className="badge">{a.sport_type || "–"}</span></span>
+              <span style={{ fontSize: 13, whiteSpace: "nowrap" }}>{a.distance_km ? `${a.distance_km} km` : "–"}</span>
+              <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{formatDuration(a.moving_time)}</span>
+              <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{formatPace(a.pace_min_per_km)}</span>
+              <span className="col-hide-narrow" style={{ fontSize: 13 }}>{a.average_heartrate ? `${Math.round(a.average_heartrate)}` : "–"}</span>
+              <span className="col-hide-narrow" style={{ fontSize: 13 }}>{a.total_elevation_gain ? `${Math.round(a.total_elevation_gain)}m` : "–"}</span>
             </div>
 
             {expandedId === a.id && (
@@ -106,9 +103,24 @@ export default function ActivitiesList({ athleteId }) {
       </div>
 
       {/* Column headers — shown as a legend above the list */}
-      <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 80px 80px 70px 70px 60px 50px", gap: 8, padding: "0 14px", order: -1 }}>
-        {["Date", "Name", "Type", "Distance", "Time", "Pace", "HR", "Elev"].map((h) => (
-          <span key={h} style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>{h}</span>
+      <div className="activities-header" style={{ padding: "0 14px", order: -1 }}>
+        {[
+          { label: "Date" },
+          { label: "Name" },
+          { label: "Type", hide: true },
+          { label: "Distance" },
+          { label: "Time" },
+          { label: "Pace" },
+          { label: "HR", hide: true },
+          { label: "Elev", hide: true },
+        ].map((h) => (
+          <span
+            key={h.label}
+            className={h.hide ? "col-hide-narrow" : undefined}
+            style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}
+          >
+            {h.label}
+          </span>
         ))}
       </div>
 
