@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -14,7 +15,8 @@ def _rank_best_efforts(db: Session, athlete_id: int):
     ranked by elapsed_time asc, ties sharing the min rank."""
     rows = (
         db.query(BestEffort.id, BestEffort.name, BestEffort.elapsed_time)
-        .filter(BestEffort.athlete_id == athlete_id)
+        .join(Activity, Activity.id == BestEffort.activity_id)
+        .filter(BestEffort.athlete_id == athlete_id, Activity.excluded.is_(False))
         .all()
     )
     groups: dict[str, list] = {}
@@ -37,8 +39,10 @@ def _rank_best_efforts(db: Session, athlete_id: int):
 
 def _rank_segment_efforts(db: Session, athlete_id: int, segment_id: int | None = None):
     """Return (rank_by_effort_id, total_by_segment_id) ranked by elapsed_time asc."""
-    q = db.query(SegmentEffort.id, SegmentEffort.segment_id, SegmentEffort.elapsed_time).filter(
-        SegmentEffort.athlete_id == athlete_id
+    q = (
+        db.query(SegmentEffort.id, SegmentEffort.segment_id, SegmentEffort.elapsed_time)
+        .join(Activity, Activity.id == SegmentEffort.activity_id)
+        .filter(SegmentEffort.athlete_id == athlete_id, Activity.excluded.is_(False))
     )
     if segment_id is not None:
         q = q.filter(SegmentEffort.segment_id == segment_id)
@@ -97,6 +101,7 @@ def pace_over_time(
             Activity.sport_type == sport_type,
             Activity.average_speed > 0,
             Activity.distance > 0,
+            Activity.excluded.is_(False),
         )
         .order_by(Activity.start_date)
         .all()
@@ -129,6 +134,7 @@ def weekly_volume(
         .filter(
             Activity.athlete_id == athlete_id,
             Activity.sport_type == sport_type,
+            Activity.excluded.is_(False),
         )
         .group_by("week")
         .order_by("week")
@@ -158,7 +164,8 @@ def athlete_segments(athlete_id: int, db: Session = Depends(get_db)):
             func.max(SegmentEffort.start_date).label("last_effort_date"),
         )
         .join(SegmentEffort, SegmentEffort.segment_id == Segment.id)
-        .filter(SegmentEffort.athlete_id == athlete_id)
+        .join(Activity, Activity.id == SegmentEffort.activity_id)
+        .filter(SegmentEffort.athlete_id == athlete_id, Activity.excluded.is_(False))
         .group_by(Segment.id, Segment.name, Segment.distance, Segment.average_grade)
         .order_by(func.count(SegmentEffort.id).desc())
         .all()
@@ -181,9 +188,11 @@ def athlete_segments(athlete_id: int, db: Session = Depends(get_db)):
 def segment_history(athlete_id: int, segment_id: int, db: Session = Depends(get_db)):
     efforts = (
         db.query(SegmentEffort)
+        .join(Activity, Activity.id == SegmentEffort.activity_id)
         .filter(
             SegmentEffort.athlete_id == athlete_id,
             SegmentEffort.segment_id == segment_id,
+            Activity.excluded.is_(False),
         )
         .order_by(SegmentEffort.start_date)
         .all()
@@ -237,7 +246,8 @@ def segment_map(athlete_id: int, segment_id: int, db: Session = Depends(get_db))
 def best_effort_prs(athlete_id: int, db: Session = Depends(get_db)):
     efforts = (
         db.query(BestEffort)
-        .filter(BestEffort.athlete_id == athlete_id)
+        .join(Activity, Activity.id == BestEffort.activity_id)
+        .filter(BestEffort.athlete_id == athlete_id, Activity.excluded.is_(False))
         .order_by(BestEffort.distance, BestEffort.elapsed_time)
         .all()
     )
@@ -270,7 +280,12 @@ def best_effort_history(
 ):
     efforts = (
         db.query(BestEffort)
-        .filter(BestEffort.athlete_id == athlete_id, BestEffort.name == name)
+        .join(Activity, Activity.id == BestEffort.activity_id)
+        .filter(
+            BestEffort.athlete_id == athlete_id,
+            BestEffort.name == name,
+            Activity.excluded.is_(False),
+        )
         .order_by(BestEffort.start_date)
         .all()
     )
@@ -287,6 +302,29 @@ def best_effort_history(
         }
         for e in efforts
     ]
+
+
+class _ExcludeBody(BaseModel):
+    excluded: bool
+
+
+@router.patch("/{athlete_id}/{activity_id}/exclude")
+def set_activity_excluded(
+    athlete_id: int,
+    activity_id: int,
+    body: _ExcludeBody,
+    db: Session = Depends(get_db),
+):
+    activity = (
+        db.query(Activity)
+        .filter(Activity.id == activity_id, Activity.athlete_id == athlete_id)
+        .first()
+    )
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    activity.excluded = body.excluded
+    db.commit()
+    return {"id": activity.id, "excluded": activity.excluded}
 
 
 @router.get("/{athlete_id}/{activity_id}")
@@ -381,5 +419,6 @@ def _activity_dict(a: Activity) -> dict:
         "suffer_score": a.suffer_score,
         "kudos_count": a.kudos_count,
         "trainer": a.trainer,
+        "excluded": a.excluded,
         "map_summary_polyline": a.map_summary_polyline,
     }

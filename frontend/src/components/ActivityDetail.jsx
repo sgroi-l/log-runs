@@ -19,14 +19,27 @@ function formatTime(secs) {
   return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `0:${String(s).padStart(2, "0")}`;
 }
 
-export default function ActivityDetail({ athleteId, activityId, onClose }) {
+export default function ActivityDetail({ athleteId, activityId, onClose, onExcludedChange }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     api.getActivity(athleteId, activityId).then(setDetail).finally(() => setLoading(false));
   }, [athleteId, activityId]);
+
+  const toggleExcluded = async () => {
+    if (!detail) return;
+    setToggling(true);
+    try {
+      const result = await api.setActivityExcluded(athleteId, activityId, !detail.excluded);
+      setDetail((d) => ({ ...d, excluded: result.excluded }));
+      onExcludedChange?.(activityId, result.excluded);
+    } finally {
+      setToggling(false);
+    }
+  };
 
   return (
     <div style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
@@ -42,7 +55,23 @@ export default function ActivityDetail({ athleteId, activityId, onClose }) {
                 {detail.description && ` · ${detail.description}`}
               </p>
             </div>
-            <button className="btn-ghost" onClick={onClose} style={{ padding: "4px 10px", fontSize: 13 }}>✕</button>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                className="btn-ghost"
+                onClick={toggleExcluded}
+                disabled={toggling}
+                title={detail.excluded ? "Include this activity in stats again" : "Hide this activity from stats and charts"}
+                style={{
+                  padding: "4px 10px",
+                  fontSize: 12,
+                  color: detail.excluded ? "var(--accent)" : "var(--muted)",
+                  borderColor: detail.excluded ? "var(--accent)" : undefined,
+                }}
+              >
+                {detail.excluded ? "Hidden from stats — restore" : "Hide from stats"}
+              </button>
+              <button className="btn-ghost" onClick={onClose} style={{ padding: "4px 10px", fontSize: 13 }}>✕</button>
+            </div>
           </div>
 
           <RouteMap

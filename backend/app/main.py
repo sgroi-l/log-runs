@@ -15,6 +15,7 @@ Base.metadata.create_all(bind=engine)
 # Lightweight column additions for existing databases (no migrations framework).
 with engine.begin() as conn:
     conn.execute(text("ALTER TABLE segments ADD COLUMN IF NOT EXISTS map_polyline TEXT"))
+    conn.execute(text("ALTER TABLE activities ADD COLUMN IF NOT EXISTS excluded BOOLEAN NOT NULL DEFAULT FALSE"))
 
 # Clear any syncs that were running when the server last shut down
 with SessionLocal() as db:

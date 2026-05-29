@@ -52,6 +52,7 @@ class Activity(Base):
     commute: Mapped[bool] = mapped_column(Boolean, default=False)
     gear_id: Mapped[str | None] = mapped_column(String(50))
     description: Mapped[str | None] = mapped_column(Text)
+    excluded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     athlete: Mapped["Athlete"] = relationship(back_populates="activities")
     segment_efforts: Mapped[list["SegmentEffort"]] = relationship(back_populates="activity")

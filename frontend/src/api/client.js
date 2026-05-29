@@ -28,6 +28,12 @@ export const api = {
     request(`/activities/${id}/segments/${segmentId}/map`),
   getActivity: (athleteId, activityId) =>
     request(`/activities/${athleteId}/${activityId}`),
+  setActivityExcluded: (athleteId, activityId, excluded) =>
+    request(`/activities/${athleteId}/${activityId}/exclude`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ excluded }),
+    }),
   getBestEffortPRs: (athleteId) =>
     request(`/activities/${athleteId}/best-efforts/prs`),
   getBestEffortHistory: (athleteId, name) =>

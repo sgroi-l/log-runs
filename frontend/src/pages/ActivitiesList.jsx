@@ -80,8 +80,9 @@ export default function ActivitiesList({ athleteId }) {
               <span style={{ color: "var(--muted)", fontSize: 12, whiteSpace: "nowrap" }}>
                 {a.start_date ? format(parseISO(a.start_date), "d MMM yy") : "–"}
               </span>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500, opacity: a.excluded ? 0.55 : 1 }}>
                 {a.name || "–"}
+                {a.excluded && <span style={{ marginLeft: 8, fontSize: 10, padding: "1px 6px", border: "1px solid var(--border)", borderRadius: 3, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Hidden</span>}
               </span>
               <span className="col-hide-narrow"><span className="badge">{a.sport_type || "–"}</span></span>
               <span style={{ fontSize: 13, whiteSpace: "nowrap" }}>{a.distance_km ? `${a.distance_km} km` : "–"}</span>
@@ -96,6 +97,9 @@ export default function ActivitiesList({ athleteId }) {
                 athleteId={athleteId}
                 activityId={a.id}
                 onClose={() => setExpandedId(null)}
+                onExcludedChange={(id, excluded) =>
+                  setData((d) => d && { ...d, items: d.items.map((it) => it.id === id ? { ...it, excluded } : it) })
+                }
               />
             )}
           </React.Fragment>
