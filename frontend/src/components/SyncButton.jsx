@@ -43,7 +43,7 @@ export default function SyncButton({ athleteId }) {
         </span>
       )}
       {status?.status === "error" && (
-        <span style={{ fontSize: 12, color: "#f87171" }}>Sync failed</span>
+        <span style={{ fontSize: 12, color: "var(--error)" }}>Sync failed</span>
       )}
       <button className="btn-primary" onClick={handleSync} disabled={isRunning}>
         {label}

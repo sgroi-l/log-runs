@@ -65,8 +65,8 @@ function formatDuration(secs) {
 }
 
 const CHART_STYLE = { fontSize: 12 };
-const GRID_STROKE = "#2a2a2a";
-const AXIS_TICK = { fill: "#888", fontSize: 11 };
+const GRID_STROKE = "var(--border)";
+const AXIS_TICK = { fill: "var(--muted)", fontSize: 11 };
 const TOOLTIP_STYLE = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)" };
 
 export default function Overview({ athleteId }) {
@@ -295,7 +295,7 @@ export default function Overview({ athleteId }) {
                 labelFormatter={(d) => `Week of ${format(parseISO(d), "d MMM yyyy")}`}
                 formatter={(v) => [`${v} km`, "Distance"]}
               />
-              <Bar dataKey="distance_km" fill="var(--accent)" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="distance_km" fill="var(--lilac)" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -30,13 +30,13 @@ function FitBounds({ positions }) {
  *   polyline        – encoded polyline string (full or summary)
  *   segments        – optional array of { segment_start_latlng, segment_end_latlng, name, pr_rank }
  *   height          – CSS height string, default "320px"
- *   accentColor     – route colour, default Strava orange
+ *   accentColor     – route colour, default saffron
  */
 export default function RouteMap({
   polyline,
   segments = [],
   height = "320px",
-  accentColor = "#fc4c02",
+  accentColor = "#ff930a",
 }) {
   if (!polyline) {
     return (
@@ -78,7 +78,7 @@ export default function RouteMap({
         const isPR = seg.pr_rank === 1;
         const icon = L.divIcon({
           className: "",
-          html: `<div style="width:10px;height:10px;border-radius:50%;background:${isPR ? "#facc15" : "#60a5fa"};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5)"></div>`,
+          html: `<div style="width:10px;height:10px;border-radius:50%;background:${isPR ? "#d1105a" : "#884ab2"};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5)"></div>`,
           iconSize: [10, 10],
           iconAnchor: [5, 5],
         });

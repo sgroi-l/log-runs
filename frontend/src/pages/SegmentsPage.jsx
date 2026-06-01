@@ -15,8 +15,8 @@ function formatTime(secs) {
   return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `0:${String(s).padStart(2, "0")}`;
 }
 
-const AXIS_TICK = { fill: "#888", fontSize: 11 };
-const GRID_STROKE = "#2a2a2a";
+const AXIS_TICK = { fill: "var(--muted)", fontSize: 11 };
+const GRID_STROKE = "var(--border)";
 
 const SORT_OPTIONS = [
   { value: "attempts", label: "Most attempts" },
@@ -206,7 +206,7 @@ export default function SegmentsPage({ athleteId }) {
                       labelFormatter={(d) => format(parseISO(d), "d MMM yyyy")}
                       formatter={(v) => [formatTime(v), "Time"]}
                     />
-                    <Line type="monotone" dataKey="elapsed_time" stroke="var(--accent)" dot={false} strokeWidth={2} activeDot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="elapsed_time" stroke="var(--saffron)" dot={false} strokeWidth={2} activeDot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

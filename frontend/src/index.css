@@ -1,13 +1,27 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0f0f0f;
-  --surface: #1a1a1a;
-  --border: #2a2a2a;
-  --text: #e8e8e8;
-  --muted: #888;
-  --accent: #fc4c02; /* Strava orange */
-  --accent-dim: rgba(252, 76, 2, 0.15);
+  /* Purple-tinted dark neutrals */
+  --bg: #120b1f;
+  --surface: #1c1430;
+  --border: #2e2348;
+  --text: #ece9f2;
+  --muted: #9990ad;
+
+  /* Brand palette (raw tokens) */
+  --royal: #471ca8;
+  --lilac: #884ab2;
+  --saffron: #ff930a;
+  --molten: #f24b04;
+  --rosewood: #d1105a;
+
+  /* Semantic roles */
+  --accent: var(--molten);
+  --accent-dim: rgba(242, 75, 4, 0.15);
+  --badge-bg: rgba(209, 16, 90, 0.15); /* rosewood-dim */
+  --badge-fg: var(--rosewood);
+  --error: #f87171;
+
   --radius: 0px;
 }
 
@@ -62,8 +76,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   border-radius: 100px;
   font-size: 11px;
   font-weight: 600;
-  background: var(--accent-dim);
-  color: var(--accent);
+  background: var(--badge-bg);
+  color: var(--badge-fg);
 }
 
 /* Responsive utilities. Narrow breakpoint = 720px. */
